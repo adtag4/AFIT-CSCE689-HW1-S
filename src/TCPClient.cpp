@@ -58,7 +58,7 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port)
         
         memset(&serv_addr, '\0', sizeof(serv_addr));
         serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = port;
+        serv_addr.sin_port = htons(port);
         // convert convert printable to numerical
         int tmp = inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr);
         if(tmp <= 0)
@@ -98,26 +98,6 @@ void TCPClient::handleConnection()
         bool active = true;
         while(active)
         {
-                FD_ZERO(&readfds);
-                FD_SET(consoleIn_, &readfds);
-                
-                int activity = select(consoleIn_ + 1, &readfds, NULL, NULL, NULL);
-                if(activity < 0)
-                {
-                        throw std::runtime_error("The OS decided to hate you");
-                }
-                
-                if(FD_ISSET(consoleIn_, &readfds))
-                {
-                        char *input = (char *) calloc(1, 100);
-                        read(consoleIn_, input, 99); 
-                        std::string data(input);
-                        clrNewlines(data);
-                        data += "\x03"; // EndOfText
-                        write(activeConnection_.getFD(), data.c_str(), data.length());
-                        free(input);
-                }
-                
                 // check for socket response
                 char *output = (char *) calloc(1, 100);
                 int valread = -1;
@@ -139,9 +119,47 @@ void TCPClient::handleConnection()
                                         break; // actual error
                         }
                 }
-                
+                fflush(stdout);
                 if(valread == 0) // connection closed 
                         active = false;
+                
+                FD_ZERO(&readfds);
+                FD_SET(consoleIn_, &readfds);
+                
+                int activity = select(consoleIn_ + 1, &readfds, NULL, NULL, NULL);
+                if(activity < 0)
+                {
+                        throw std::runtime_error("The OS decided to hate you");
+                }
+                
+                if(FD_ISSET(consoleIn_, &readfds))
+                {
+                        char *input = (char *) calloc(1, 100);
+                        int index = 0;
+                        char c;
+                        while(read(consoleIn_, &c, 1) > 0)
+                        {
+                                input[index] = c;
+                                if(c == '\n' || c == '\r')
+                                        break;
+                                index++;
+                                
+                                
+                                
+                                //std::cout << std::string(input);
+                        }
+                        
+                        fflush(stdin);
+                        fflush(stdout);
+                        
+                        std::string data(input);
+                        clrNewlines(data);
+                        data += "\x03"; // EndOfText
+                        write(activeConnection_.getFD(), data.c_str(), data.length());
+                        free(input);
+                }
+                
+                
         }
 }
 
