@@ -26,6 +26,11 @@
 TCPClient::TCPClient() 
 {
         consoleIn_ = 0; // 0 is stdin
+        int tmp = fcntl(consoleIn_, F_SETFL, fcntl(consoleIn_, F_GETFL, 0) | O_NONBLOCK);
+        if(tmp == -1)
+        {
+                throw std::runtime_error("Could not set non-blocking on stdin");
+        }
 }
 
 /**********************************************************************************************
@@ -94,7 +99,8 @@ void TCPClient::handleConnection()
         // prepare for select() to non-block stdin 
         fd_set readfds;
         
-        
+        struct timeval delay;
+        int index = 0;
         bool active = true;
         while(active)
         {
@@ -107,9 +113,10 @@ void TCPClient::handleConnection()
                         {
                                 if(output[i] != '\x03')
                                         std::cout << output[i];
+                                else
+                                        std::cout << std::endl;
                                 output[i] = '\0';
                         }
-                        
                         if(valread == -1)
                         {
                                 if((errno == EAGAIN) || (errno == EWOULDBLOCK)) // nothing to read, but still open
@@ -126,7 +133,10 @@ void TCPClient::handleConnection()
                 FD_ZERO(&readfds);
                 FD_SET(consoleIn_, &readfds);
                 
-                int activity = select(consoleIn_ + 1, &readfds, NULL, NULL, NULL);
+                delay.tv_sec = 0;
+                delay.tv_usec = 10; // very small delay :)
+                
+                int activity = select(consoleIn_ + 1, &readfds, NULL, NULL, &delay);
                 if(activity < 0)
                 {
                         throw std::runtime_error("The OS decided to hate you");
@@ -135,22 +145,17 @@ void TCPClient::handleConnection()
                 if(FD_ISSET(consoleIn_, &readfds))
                 {
                         char *input = (char *) calloc(1, 100);
-                        int index = 0;
                         char c;
                         while(read(consoleIn_, &c, 1) > 0)
                         {
                                 input[index] = c;
                                 if(c == '\n' || c == '\r')
+                                {
+                                        index = 0;
                                         break;
+                                }
                                 index++;
-                                
-                                
-                                
-                                //std::cout << std::string(input);
                         }
-                        
-                        fflush(stdin);
-                        fflush(stdout);
                         
                         std::string data(input);
                         clrNewlines(data);
@@ -158,6 +163,9 @@ void TCPClient::handleConnection()
                         write(activeConnection_.getFD(), data.c_str(), data.length());
                         free(input);
                 }
+                
+                fflush(stdin);
+                fflush(stdout);
                 
                 
         }
