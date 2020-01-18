@@ -1,8 +1,6 @@
 #ifndef TCPCONN_H
 #define TCPCONN_H
 
-#include "FileDesc.h"
-
 const int max_attempts = 2;
 
 class TCPConn 
@@ -11,7 +9,7 @@ public:
    TCPConn();
    ~TCPConn();
 
-   bool accept(SocketFD &server);
+   bool accept(int socketFD);
 
    int sendText(const char *msg);
    int sendText(const char *msg, int size);
@@ -39,7 +37,7 @@ private:
 
    statustype _status = s_username;
 
-   SocketFD _connfd;
+   int socketFD_;
  
    std::string _username; // The username this connection is associated with
 
